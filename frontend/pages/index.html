@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trainer Online</title>
+  <link rel="stylesheet" href="../styles/main.css">
+</head>
+<body>
+<nav>
+  <a class="logo" href="index.html">Trainer Online</a>
+  <div class="nav-links">
+    <span id="nav-user"></span>
+    <a id="nav-login" href="login.html">Войти</a>
+    <a id="nav-logout" href="#" style="display:none">Выйти</a>
+  </div>
+</nav>
+
+<div class="container">
+  <div class="page-header">
+    <h1>Тренировки</h1>
+    <button id="btn-new" class="btn btn-primary" style="display:none">+ Создать</button>
+  </div>
+  <div id="workouts-list"></div>
+</div>
+
+<!-- Модальное окно создания тренировки -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h3>Новая тренировка</h3>
+    <div class="form-group">
+      <label>Название</label>
+      <input id="m-title" type="text" placeholder="Название тренировки">
+    </div>
+    <div class="form-group">
+      <label>Описание</label>
+      <input id="m-desc" type="text" placeholder="Краткое описание">
+    </div>
+    <div id="m-error" class="form-error"></div>
+    <div style="display:flex;gap:.6rem;margin-top:1rem">
+      <button class="btn btn-primary" id="m-save">Создать</button>
+      <button class="btn btn-outline" id="m-cancel">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { api, getUser, isTrainer } from '../scripts/api.js';
+
+  const user = getUser();
+
+  // nav
+  if (user) {
+    document.getElementById('nav-user').textContent = user.name;
+    document.getElementById('nav-login').style.display = 'none';
+    document.getElementById('nav-logout').style.display = '';
+  }
+  document.getElementById('nav-logout').addEventListener('click', () => {
+    localStorage.clear();
+    location.reload();
+  });
+
+  if (isTrainer()) document.getElementById('btn-new').style.display = '';
+
+  async function loadWorkouts() {
+    const list = document.getElementById('workouts-list');
+    try {
+      const workouts = await api.getWorkouts();
+      if (!workouts.length) {
+        list.innerHTML = '<p class="empty">Тренировок пока нет</p>';
+        return;
+      }
+      list.innerHTML = workouts.map(w => `
+        <a class="card" href="workout.html?id=${w.id}">
+          <div class="card-title">${w.title}</div>
+          <div class="card-meta">${w.exercises.length} упражнений · ${w.created_at?.slice(0,10) ?? ''}</div>
+          ${isTrainer() ? `<div class="card-actions" onclick="event.preventDefault()">
+            <button class="btn btn-danger btn-sm" data-del="${w.id}">Удалить</button>
+          </div>` : ''}
+        </a>
+      `).join('');
+
+      list.querySelectorAll('[data-del]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          if (!confirm('Удалить тренировку?')) return;
+          await api.deleteWorkout(btn.dataset.del);
+          loadWorkouts();
+        });
+      });
+    } catch (e) {
+      list.innerHTML = `<p class="empty">${e.message}</p>`;
+    }
+  }
+
+  loadWorkouts();
+
+  // modal
+  document.getElementById('btn-new').addEventListener('click', () =>
+    document.getElementById('modal').classList.add('open'));
+  document.getElementById('m-cancel').addEventListener('click', () =>
+    document.getElementById('modal').classList.remove('open'));
+  document.getElementById('m-save').addEventListener('click', async () => {
+    const title = document.getElementById('m-title').value.trim();
+    const desc  = document.getElementById('m-desc').value.trim();
+    const err   = document.getElementById('m-error');
+    if (!title) { err.textContent = 'Введите название'; return; }
+    try {
+      await api.createWorkout(title, desc);
+      document.getElementById('modal').classList.remove('open');
+      document.getElementById('m-title').value = '';
+      document.getElementById('m-desc').value  = '';
+      err.textContent = '';
+      loadWorkouts();
+    } catch (e) { err.textContent = e.message; }
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Тренировка — Trainer Online</title>
+  <link rel="stylesheet" href="../styles/main.css">
+</head>
+<body>
+<nav>
+  <a class="logo" href="index.html">Trainer Online</a>
+  <div class="nav-links">
+    <span id="nav-user"></span>
+    <a href="index.html" class="btn btn-outline btn-sm">← Все тренировки</a>
+  </div>
+</nav>
+
+<div class="container">
+  <div id="workout-header" class="workout-header"></div>
+  <div class="page-header">
+    <h2>Упражнения</h2>
+    <button id="btn-add-ex" class="btn btn-primary btn-sm" style="display:none">+ Упражнение</button>
+  </div>
+  <ul id="exercise-list" class="exercise-list"></ul>
+</div>
+
+<!-- Модальное окно добавления упражнения -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h3>Добавить упражнение</h3>
+    <div class="form-group"><label>Название</label><input id="e-name" type="text" placeholder="Название"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
+      <div class="form-group"><label>Подходы</label><input id="e-sets" type="number" value="3" min="1"></div>
+      <div class="form-group"><label>Повторения</label><input id="e-reps" type="number" value="10" min="1"></div>
+    </div>
+    <div class="form-group"><label>Длительность (сек, 0 = без таймера)</label><input id="e-dur" type="number" value="0" min="0"></div>
+    <div class="form-error" id="e-error"></div>
+    <div style="display:flex;gap:.6rem;margin-top:1rem">
+      <button class="btn btn-primary" id="e-save">Добавить</button>
+      <button class="btn btn-outline" id="e-cancel">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { api, getUser, isTrainer } from '../scripts/api.js';
+
+  const user = getUser();
+  if (user) document.getElementById('nav-user').textContent = user.name;
+
+  const id = new URLSearchParams(location.search).get('id');
+  if (!id) { location.href = 'index.html'; }
+
+  let workout = null;
+
+  async function load() {
+    try {
+      workout = await api.getWorkout(id);
+      renderHeader();
+      renderExercises();
+    } catch (e) {
+      document.getElementById('workout-header').innerHTML = `<p class="empty">${e.message}</p>`;
+    }
+  }
+
+  function renderHeader() {
+    document.title = `${workout.title} — Trainer Online`;
+    document.getElementById('workout-header').innerHTML = `
+      <h1>${workout.title}</h1>
+      ${workout.description ? `<p>${workout.description}</p>` : ''}
+    `;
+    if (isTrainer() && user.id === workout.trainer_id)
+      document.getElementById('btn-add-ex').style.display = '';
+  }
+
+  function renderExercises() {
+    const list = document.getElementById('exercise-list');
+    if (!workout.exercises.length) {
+      list.innerHTML = '<p class="empty">Упражнений нет</p>';
+      return;
+    }
+    list.innerHTML = workout.exercises.map((ex, i) => `
+      <li class="exercise-item">
+        <div style="display:flex;align-items:center">
+          <div class="exercise-num">${i + 1}</div>
+          <div>
+            <div class="exercise-name">${ex.name}</div>
+            <div class="exercise-stats">
+              ${ex.duration_seconds ? `${ex.duration_seconds} сек` : `${ex.sets} × ${ex.reps} повт.`}
+            </div>
+          </div>
+        </div>
+        ${isTrainer() && user.id === workout.trainer_id
+          ? `<button class="btn btn-danger btn-sm" data-del="${ex.id}">✕</button>`
+          : ''}
+      </li>
+    `).join('');
+
+    list.querySelectorAll('[data-del]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        await api.deleteExercise(btn.dataset.del);
+        load();
+      });
+    });
+  }
+
+  load();
+
+  // modal
+  document.getElementById('btn-add-ex').addEventListener('click', () =>
+    document.getElementById('modal').classList.add('open'));
+  document.getElementById('e-cancel').addEventListener('click', () =>
+    document.getElementById('modal').classList.remove('open'));
+  document.getElementById('e-save').addEventListener('click', async () => {
+    const name = document.getElementById('e-name').value.trim();
+    const err  = document.getElementById('e-error');
+    if (!name) { err.textContent = 'Введите название'; return; }
+    try {
+      await api.addExercise(id, {
+        name,
+        sets: +document.getElementById('e-sets').value,
+        reps: +document.getElementById('e-reps').value,
+        duration_seconds: +document.getElementById('e-dur').value,
+        sort_order: workout.exercises.length,
+      });
+      document.getElementById('modal').classList.remove('open');
+      document.getElementById('e-name').value = '';
+      err.textContent = '';
+      load();
+    } catch (ex) { err.textContent = ex.message; }
+  });
+</script>
+</body>
+</html>
