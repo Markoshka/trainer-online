@@ -4,6 +4,7 @@
 
 ## Структура
 
+```
 trainer-online/
 ├── backend/          # FastAPI приложение
 │   ├── app/
@@ -21,5 +22,4 @@ trainer-online/
 ├── docker-compose.yml
 ├── .gitignore
 └── README.md
-
-Some changes
+```
