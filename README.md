@@ -19,6 +19,12 @@ trainer-online/
 │   │   ├── pages/
 │   │   └── api/
 │   └── package.json
+├── docs/
+│   └── source/       # Документация
+│       ├── conf.py
+│       ├── index.rst
+│       ├── modules.rst
+│       └── app.rst
 ├── docker-compose.yml
 ├── .gitignore
 └── README.md
